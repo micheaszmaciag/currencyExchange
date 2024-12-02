@@ -5,5 +5,5 @@ from . import views
 urlpatterns = [
     path('', views.getRoutes),
     path('currency/', views.getCurrency),
-    path('currency/<str:currency>/<str:second>/', views.getCurrencyRate),
+    path('currency/<str:base_currency>/<str:quote_currency>/', views.getCurrencyRate),
 ]

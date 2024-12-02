@@ -1,8 +1,7 @@
 from django.contrib import admin
-from .models import Currency, CurrencyBidNow, CurrencyHistoryBid
+from .models import Currency, CurrencyHistoryBid
 # Register your models here.
 
 
-admin.site.register(Currency)
-admin.site.register(CurrencyBidNow)
+
 admin.site.register(CurrencyHistoryBid)
