@@ -1,0 +1,34 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+
+# C extensions
+*.so
+
+# Virtual environment
+venv/
+env/
+
+# Environment variables
+.env
+
+# Text backup files
+*.bak
+
+# SQLite database
+*.sqlite3
+
+# Media files
+media/
+
+# Collected Static files
+/staticfiles/
+
+# Logs
+*.log
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Other or temporary files
