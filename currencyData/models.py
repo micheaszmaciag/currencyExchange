@@ -17,15 +17,24 @@ class Currency(models.Model):
         return f'{self.code}'
 
 
+class Transaction(models.Model):
+    name = models.CharField(max_length=10, unique=True, null=True, blank=True)
+
+    def __str__(self):
+        return self.name
+
+
 class CurrencyHistoryBid(models.Model):
-    history_transaction_name = models.CharField(max_length=10, null=True, blank=True)
+    transaction_name = models.ForeignKey(Transaction,on_delete=models.CASCADE , null=True, blank=True)
     history_transaction_rate = models.FloatField(default=0.0, null=True, blank=True)
     history_date = models.DateField(auto_now_add=False)
     id = models.UUIDField(default=uuid.uuid4, unique=True,
                           primary_key=True, editable=False)
 
     def __str__(self):
-        return f'{self.history_transaction_name} - {self.history_date.strftime("%Y-%m-%d")}'
+        return f'{self.transaction_name} - {self.history_date.strftime("%Y-%m-%d")}'
 
     class Meta:
-        ordering = ['history_transaction_name', '-history_date']
+        ordering = ['transaction_name', '-history_date']
+
+

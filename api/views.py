@@ -3,7 +3,7 @@ from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from .serializers import CurrencySerializer
 from currencyData.models import Currency
-from currencyData.services import fetch_historical_rate, save_historical_data
+from currencyData.services import save_transaction
 
 
 @api_view(['GET'])
@@ -12,16 +12,17 @@ def getRoutes(request):
         {'GET': '/currency/',
          'description': 'list of all currencies',
          'filters': {
-             'code': 'Filter by currency code ( e.g: /currency/?code=USD ) or a single letter to find matching currencies (e.g. /currency/?code=U/ will return USD, AUD, etc.).',
-             'min_rate': 'Minimum rate value ( e.g., /currency/?min_rate=1.0 )',
-             'max_rate': 'Maximum rate value ( e.g., /currency/?max_rate=1.5 )',
-             'min_rate&max_rate': 'Returns values between the minimum and maximum rates ( e.g., /currency//?min_rate=1.5&max_rate=3 )',
-             'sort_by & order': 'Returns sorted values by ASC or DESC available sort values (code, rate_currency ) (e.g of use /currency/?sort_by=code&order=ASC) '
+             'code': 'Filter by currency code ( e.g : /currency/?code=USD ) or a single letter to find matching currencies '
+                     '(e.g. /currency/?code=U/ will return USD, AUD, etc.).',
+             'min_rate': 'Minimum rate value ( e.g. : /currency/?min_rate=1.0 )',
+             'max_rate': 'Maximum rate value ( e.g. : /currency/?max_rate=1.5 )',
+             'min_rate&max_rate': 'Returns values between the minimum and maximum rates ( e.g. : /currency/?min_rate=1.5&max_rate=3 )',
+             'sort_by & order': 'Returns sorted values by ASC or DESC available sort values (code, rate_currency ) (e.g of use : /currency/?sort_by=code&order=ASC) '
          }
          },
 
         {'GET': '/currency/EUR/USD/',
-         'description': 'returns exchange rate of value (ex: /currency/EUR/USD/)'
+         'description': 'returns exchange rate of value (e.g. : /currency/EUR/USD/)'
          },
     ]
 
@@ -30,8 +31,18 @@ def getRoutes(request):
 
 @api_view(['GET'])
 def getCurrency(request):
+    '''
+    Retrieves a list of currencies from the database.
+
+    Query Parameters:
+        - code (str): Filter currencies by code
+        - order (str): Sorting order ('asc' or 'desc').
+        - sort_by (str): Field to sort by ('code' or 'rate_currency').
+        - min_rate (float): Minimum rate for filtering.
+        - max_rate (float): Maximum rate for filtering.
+    '''
     code = request.GET.get('code')
-    order = request.GET.get('order')
+    order = request.GET.get('order', 'asc').lower()
     sort_by = request.GET.get('sort_by')
     min_rate = request.GET.get('min_rate')
     max_rate = request.GET.get('max_rate')
@@ -45,23 +56,33 @@ def getCurrency(request):
             min_rate_value = float(min_rate)
             currency = currency.filter(rate_currency__gte=min_rate_value)
         except ValueError:
-            return Response({'error': 'min_rate must be a number e.g: 1.0 or 2.5'})
+            return Response({
+                'error': "'min_rate' must be a valid decimal number. Example: ?min_rate=1.0"
+            })
     if max_rate:
         try:
             max_rate_value = float(max_rate)
             currency = currency.filter(rate_currency__lte=max_rate_value)
         except ValueError:
-            return Response({'error': 'max_rate must be a number e.g: 1.0 or 2.5'})
+            return Response({
+                'error': "'max_rate' must be a valid decimal number. Example: ?max_rate=1.0"
+            })
 
     if sort_by:
-        try:
-            valid_sort_fields = ['code', 'rate_currency']
-            if sort_by in valid_sort_fields:
-                if order == 'desc':
-                    sort_by = f'-{sort_by}'
-                currency = currency.order_by(sort_by)
-        except ValueError:
-            return Response({'error': f'Invalid poll of sort. Available one: {valid_sort_fields}'})
+        valid_sort_fields = ['code', 'rate_currency']
+        print(sort_by)
+        if sort_by not in valid_sort_fields:
+            return Response({
+                'error': f"'sort_by' must be one of the following fields: {', '.join(valid_sort_fields)}"
+            })
+        valid_orders = ['asc', 'desc']
+        if order not in valid_orders:
+            return Response({
+                'error': "Invalid value for 'order'. Use 'asc' or 'desc'."
+            })
+
+        sort_field = f'-{sort_by}' if order == 'desc' else sort_by
+        currency = currency.order_by(sort_field)
 
     serializer = CurrencySerializer(currency, many=True)
     return Response(serializer.data)
@@ -69,27 +90,40 @@ def getCurrency(request):
 
 @api_view(['GET'])
 def getCurrencyRate(request, base_currency, quote_currency):
+    '''
+     Fetches the exchange rate for a currency pair and saves the transaction.
+
+    args:
+        base_currency (str): The base currency code (e.g., 'EUR').
+        quote_currency (str): The quote currency code (e.g., 'USD').
+
+
+    return:
+        Response: A dictionary containing the currency pair and the exchange rate
+    '''
     try:
         first_currency = Currency.objects.get(code=base_currency.upper())
         second_currency = Currency.objects.get(code=quote_currency.upper())
-    except:
+    except Exception as error:
         return Response({
-            'error': 'One of the entered values does not exist or is input incorrectly. Example of a correct format: /currency/EUR/USD/'})
+            'error': f'One of the entered currency codes does not exist. Example format: /currency/EUR/USD/ {error}'
+        })
 
     try:
-        rate = round(first_currency.rate_currency / second_currency.rate_currency, 3)
+        rate = (first_currency.rate_currency / second_currency.rate_currency)
         result = {'currency_pair': f'{base_currency.upper()}{quote_currency.upper()}', 'exchange_rate': rate}
     except ZeroDivisionError:
-        return Response({'error': 'One of the value could be a 0 we cannot divide by 0'})
+        return Response({
+            'error': 'The quote currency rate is 0. Division by zero is not allowed'
+        })
 
     try:
         symbol = base_currency.upper() + quote_currency.upper()
-        #
-        historical_data = fetch_historical_rate(symbol)
-        save_historical_data(symbol, historical_data)
-
+        if len(symbol) == 6:
+            save_transaction(symbol.upper())
     except Exception as error:
-        return Response({'error': f'Raise error: {str(error)}'})
-
+        return Response({
+            'error': f'An error occurred while saving the transaction: {str(error)}'
+        })
 
     return Response(result)
