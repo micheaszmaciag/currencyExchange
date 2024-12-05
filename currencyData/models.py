@@ -23,7 +23,7 @@ class Transaction(models.Model):
 
 
 class CurrencyHistoryBid(models.Model):
-    transaction_name = models.ForeignKey(Transaction,on_delete=models.CASCADE , null=True, blank=True)
+    transaction_name = models.ForeignKey(Transaction, on_delete=models.CASCADE, null=True, blank=True)
     history_transaction_rate = models.FloatField(default=0.0, null=True, blank=True)
     history_date = models.DateField(auto_now_add=False)
     id = models.UUIDField(default=uuid.uuid4, unique=True,
@@ -34,5 +34,3 @@ class CurrencyHistoryBid(models.Model):
 
     class Meta:
         ordering = ['transaction_name', '-history_date']
-
-

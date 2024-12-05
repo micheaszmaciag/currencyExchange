@@ -5,7 +5,8 @@
 This Django application provides a REST API for managing and querying currency exchange rates.
 The application fetches the latest rates from the NBP API (Narodowy Bank Polski)
 and stores them in a local database. It also supports historical data tracking via
-the admin panel, allowing users to view records from up to 30 days in the past.
+the admin panel, allowing users to view records from up to 30 days in the past while 
+ignoring weekends when the market is closed.
 
 ## Features
 
@@ -74,14 +75,15 @@ exchange rates. Filters for **date ranges** and **currency pair** names simplify
 
 * **Django-admin-rangefilter:** A library that adds date range filter to the admin interface
 
-* **Pandas:** Used to handle calendar-based working date calculations.
+* **Pandas:** Handles calendar-based working days, excluding weekends when the market is closed
+
 
 ## Installation and Setup
 
 1. Clone the repository:
 
 ```bash
-git clone 
+git clone https://github.com/micheaszmaciag/currencyExchange
 ```
 
 2. Install dependencies:
@@ -106,6 +108,12 @@ python manage.py load_rates
 
 ```bash
 python manage.py runserver
+```
+
+6. Create a superuser to access the admin panel (recommended):
+
+```bash
+python manage.py createsuperuser
 ```
 
 ## Running Test:
@@ -135,4 +143,4 @@ records by date range, which is particularly useful for managing historical curr
 
 ## AUTHOR
 
-### Micheasz Maciąg
+## Micheasz Maciąg
