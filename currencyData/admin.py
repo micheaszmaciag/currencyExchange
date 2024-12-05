@@ -2,7 +2,7 @@ from django.utils import timezone
 from django.contrib import admin
 from rangefilter.filters import DateRangeFilter
 from .services import fetch_historical_rate
-from .models import CurrencyHistoryBid
+from .models import CurrencyHistoryBid, Currency
 from django.core.cache import cache
 
 # Register your models here.

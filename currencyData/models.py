@@ -2,8 +2,6 @@ from django.db import models
 from django.core.validators import MinValueValidator
 import uuid
 
-import requests
-
 
 # Create your models here.
 

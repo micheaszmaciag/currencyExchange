@@ -1,6 +1,6 @@
-import datetime
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
+from rest_framework import status
 from .serializers import CurrencySerializer
 from currencyData.models import Currency
 from currencyData.services import save_transaction
@@ -51,6 +51,11 @@ def getCurrency(request):
 
     if code:
         currency = currency.filter(code__icontains=code)
+    if min_rate and max_rate:
+        if float(min_rate) > float(max_rate):
+            return Response({
+                'error': f'min_rate: ({min_rate}) cannot be greater than max_rate: ({max_rate}).'
+            }, status=status.HTTP_400_BAD_REQUEST)
     if min_rate:
         try:
             min_rate_value = float(min_rate)
@@ -58,7 +63,7 @@ def getCurrency(request):
         except ValueError:
             return Response({
                 'error': "'min_rate' must be a valid decimal number. Example: ?min_rate=1.0"
-            })
+            }, status=status.HTTP_400_BAD_REQUEST)
     if max_rate:
         try:
             max_rate_value = float(max_rate)
@@ -66,20 +71,20 @@ def getCurrency(request):
         except ValueError:
             return Response({
                 'error': "'max_rate' must be a valid decimal number. Example: ?max_rate=1.0"
-            })
+            }, status=status.HTTP_400_BAD_REQUEST)
 
     if sort_by:
-        valid_sort_fields = ['code', 'rate_currency']
+        valid_sort_fields = ['code']
         print(sort_by)
         if sort_by not in valid_sort_fields:
             return Response({
                 'error': f"'sort_by' must be one of the following fields: {', '.join(valid_sort_fields)}"
-            })
+            }, status=status.HTTP_400_BAD_REQUEST)
         valid_orders = ['asc', 'desc']
         if order not in valid_orders:
             return Response({
                 'error': "Invalid value for 'order'. Use 'asc' or 'desc'."
-            })
+            }, status=status.HTTP_400_BAD_REQUEST)
 
         sort_field = f'-{sort_by}' if order == 'desc' else sort_by
         currency = currency.order_by(sort_field)
@@ -107,7 +112,7 @@ def getCurrencyRate(request, base_currency, quote_currency):
     except Exception as error:
         return Response({
             'error': f'One of the entered currency codes does not exist. Example format: /currency/EUR/USD/ {error}'
-        })
+        }, status=status.HTTP_400_BAD_REQUEST)
 
     try:
         rate = (first_currency.rate_currency / second_currency.rate_currency)
@@ -115,7 +120,7 @@ def getCurrencyRate(request, base_currency, quote_currency):
     except ZeroDivisionError:
         return Response({
             'error': 'The quote currency rate is 0. Division by zero is not allowed'
-        })
+        }, status=status.HTTP_400_BAD_REQUEST)
 
     try:
         symbol = base_currency.upper() + quote_currency.upper()
@@ -124,6 +129,6 @@ def getCurrencyRate(request, base_currency, quote_currency):
     except Exception as error:
         return Response({
             'error': f'An error occurred while saving the transaction: {str(error)}'
-        })
+        }, status=status.HTTP_400_BAD_REQUEST)
 
     return Response(result)

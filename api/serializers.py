@@ -7,7 +7,7 @@ class CurrencySerializer(serializers.ModelSerializer):
         model = Currency
         fields = ['code']
 
-# I keep in case I will build some filter
+# Placeholder for future use
 
 # class CurrencyRateSerializer(serializers.ModelSerializer):
 #     class Meta:
