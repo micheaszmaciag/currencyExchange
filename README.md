@@ -77,6 +77,8 @@ exchange rates. Filters for **date ranges** and **currency pair** names simplify
 
 * **Pandas:** Handles calendar-based working days, excluding weekends when the market is closed
 
+* **Django Cache:** Used to optimize performance by caching frequently accessed exchange rate data, reducing API calls to the NBP API.
+
 
 ## Installation and Setup
 
