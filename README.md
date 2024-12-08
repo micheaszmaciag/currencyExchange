@@ -106,16 +106,16 @@ python manage.py migrate
 python manage.py load_rates
 ```
 
-5. Start the development server:
-
-```bash
-python manage.py runserver
-```
-
-6. Create a superuser to access the admin panel (recommended):
+5. Create a superuser to access the admin panel (recommended):
 
 ```bash
 python manage.py createsuperuser
+```
+
+6. Start the development server:
+
+```bash
+python manage.py runserver
 ```
 
 ## Running Test:
