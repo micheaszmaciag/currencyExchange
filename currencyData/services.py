@@ -40,16 +40,16 @@ def get_currency():
 
     '''
     # fetch current data day. Check that this day is not a Saturday or Sunday.
-    today = (pandas.Timestamp.now().normalize() - pandas.offsets.BDay(1).date() if pandas.Timestamp.now().weekday() >= 5 else pandas.Timestamp.now().normalize().date())
+    today = ((pandas.Timestamp.now().normalize() - pandas.offsets.BDay(1)).date() if pandas.Timestamp.now().weekday() >= 5 else pandas.Timestamp.now().normalize().date())
 
-    # take currency actual code and rate from NBP API
+    # take currency code and rate from NBP API
     try:
         data = requests.get(f'{NBP_API}{today}/')
         if data.status_code == 200:
             if 'rates' in data.json()[0]:
                 return {currency['code']: currency['bid'] for currency in data.json()[0]['rates']}
             else:
-                return {'error': f'There is no rates in {data.json()[0]["rates"]}'}
+                return {'error': f'There is no rates in {data.json()[0]}'}
     except:
         return {'error': f'Something Went Wrong {data.status_code}'}
 
