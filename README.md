@@ -108,38 +108,38 @@ python manage.py load_rates
 
 6. **Create a superuser to access the admin panel (recommended):**
 
-   ```bash
-   python manage.py createsuperuser
-   ```
+```bash
+python manage.py createsuperuser
+```
 
 ### Setting up Docker, Redis, and Celery
 
 **Note:** These steps are required before running the development server. Without Redis and Celery, background tasks (e.g., fetching historical exchange rates) will not function properly.
 
-* **Install Docker (if not already installed):**
-   - Follow the official Docker installation guide for your platform:  
+  * **Install Docker (if not already installed):**
+     - Follow the official Docker installation guide for your platform:  
      [https://docs.docker.com/get-docker/](https://docs.docker.com/get-docker/)
 
-* **Run Redis in a Docker container:**
-   - Run the following command to start a Redis container named `fetchDataRedis` on port `6379`:
-     ```bash
-     docker run -d -p 6379:6379 --name fetchDataRedis redis
-     ```
-   - After running this, you can verify Redis is running by:
-     ```bash
-     docker ps
-     ```
-   - In the Django settings (`settings.py`), ensure your Celery settings point to the local Redis:
-     ```python
-     CELERY_BROKER_URL = 'redis://localhost:6379/0'
-     CELERY_RESULT_BACKEND = 'redis://localhost:6379/0'
-     ```
+  * **Run Redis in a Docker container:**
+     - Run the following command to start a Redis container named `fetchDataRedis` on port `6379`:
+       ```bash
+       docker run -d -p 6379:6379 --name fetchDataRedis redis
+       ```
+     - After running this, you can verify Redis is running by:
+       ```bash
+       docker ps
+       ```
+     - In the Django settings (`settings.py`), ensure your Celery settings point to the local Redis:
+       ```python
+       CELERY_BROKER_URL = 'redis://localhost:6379/0'
+       CELERY_RESULT_BACKEND = 'redis://localhost:6379/0'
+       ```
 
-* **Start the Celery worker:** Open a new terminal window/tab in your project directory and run:
-   ```bash
-   celery -A currencyExchange worker --loglevel=info --pool=solo
-   ```
-   This will start a Celery worker that processes background tasks.
+    * **Start the Celery worker:** Open a new terminal window/tab in your project directory and run:
+       ```bash
+       celery -A currencyExchange worker --loglevel=info --pool=solo
+       ```
+       This will start a Celery worker that processes background tasks.
 
 7. **Start the development server:**
    ```bash
