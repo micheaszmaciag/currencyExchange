@@ -88,7 +88,7 @@ pip install -r requirements.txt
 
 3. **Set your SECRET_KEY:**
 
-Open ``settings.py`` and set a unique, secret value for ``SECRET_KEY``. For example:
+    Open ``settings.py`` and set a unique, secret value for ``SECRET_KEY``. For example:
 
 ```bash
   SECRET_KEY = 'your-secret-key-and-unique-key' 
@@ -116,33 +116,33 @@ python manage.py createsuperuser
 **Note:** These steps are required before running the development server. Without Redis and Celery,
 background tasks (fetching historical exchange rates) will not function properly.
 
-1. **Install Docker (if not already installed):**
+   1. **Install Docker (if not already installed):**
 
-   * Follow the official Docker installation guide for your platform:
-    https://docs.docker.com/get-docker/
+      * Follow the official Docker installation guide for your platform:
+       https://docs.docker.com/get-docker/
 
 
-2. **Run Redis in a Docker container:**
+   2. **Run Redis in a Docker container:**
 
-   * Run the following command to start a Redis container named ``fetchDataRedis`` on port ``6379``:
-   ```bash
-      docker run -d -p 6379:6379 --name fetchDataRedis redis   
-   ```
-   * After running this, you can verify Redis is running by:
-   ```bash
-      docker ps    
-   ```
-   * In the Django settings (``settings.py``), ensure your Celery settings point to the local Redis:
-   ```bash
-      CELERY_BROKER_URL = 'redis://localhost:6379/0'
-      CELERY_RESULT_BACKEND = 'redis://localhost:6379/0'
-   ```
-3. **Start the Celery worker:** Open a new terminal window/tab in your project directory and run:
-   ```bash
-      celery -A currencyExchange worker --loglevel=info --pool=solo
-   ```
-   This will start a Celery worker that processes background tasks
+      * Run the following command to start a Redis container named ``fetchDataRedis`` on port ``6379``:
+       ```bash
+       docker run -d -p 6379:6379 --name fetchDataRedis redis   
+       ```
+      * After running this, you can verify Redis is running by:
+       ```bash
+           docker ps    
+       ```
+      * In the Django settings (``settings.py``), ensure your Celery settings point to the local Redis:
+       ```bash
+          CELERY_BROKER_URL = 'redis://localhost:6379/0'
+          CELERY_RESULT_BACKEND = 'redis://localhost:6379/0'
+       ```
 
+   3. **Start the Celery worker:** Open a new terminal window/tab in your project directory and run:
+      ```bash
+         celery -A currencyExchange worker --loglevel=info --pool=solo
+      ```
+      This will start a Celery worker that processes background tasks
 
 
 7. **Start the development server:**
