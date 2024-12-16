@@ -116,11 +116,11 @@ python manage.py load_rates
 
 **Note:** These steps are required before running the development server. Without Redis and Celery, background tasks (e.g., fetching historical exchange rates) will not function properly.
 
-1. **Install Docker (if not already installed):**
+* **Install Docker (if not already installed):**
    - Follow the official Docker installation guide for your platform:  
      [https://docs.docker.com/get-docker/](https://docs.docker.com/get-docker/)
 
-2. **Run Redis in a Docker container:**
+* **Run Redis in a Docker container:**
    - Run the following command to start a Redis container named `fetchDataRedis` on port `6379`:
      ```bash
      docker run -d -p 6379:6379 --name fetchDataRedis redis
@@ -135,12 +135,11 @@ python manage.py load_rates
      CELERY_RESULT_BACKEND = 'redis://localhost:6379/0'
      ```
 
-3. **Start the Celery worker:** Open a new terminal window/tab in your project directory and run:
+* **Start the Celery worker:** Open a new terminal window/tab in your project directory and run:
    ```bash
    celery -A currencyExchange worker --loglevel=info --pool=solo
    ```
    This will start a Celery worker that processes background tasks.
-
 
 7. **Start the development server:**
    ```bash
