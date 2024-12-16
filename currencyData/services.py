@@ -1,9 +1,10 @@
 import requests
 import pandas
-from .models import CurrencyHistoryBid, Transaction
-
-NBP_API = 'https://api.nbp.pl/api/exchangerates/tables/c/'
-
+from .models import CurrencyExchangeRate, Currency
+from .tasks import update_pair_history
+from django.core.cache import cache
+from openpyxl.utils import get_column_letter
+from django.http import HttpResponse
 
 def get_today_and_last_30_days(start_date='', end_date=''):
     """
@@ -13,7 +14,7 @@ def get_today_and_last_30_days(start_date='', end_date=''):
 
     :return: tuple dates (start_date, end_date) as working days
     """
-    # Placeholder for future use
+    # for future use
     # start_date = pandas.Timestamp(start_date)
 
     # Get the current day
@@ -41,7 +42,7 @@ def get_currency():
     '''
     # fetch current data day. Check that this day is not a Saturday or Sunday.
     today = ((pandas.Timestamp.now().normalize() - pandas.offsets.BDay(1)).date() if pandas.Timestamp.now().weekday() >= 5 else pandas.Timestamp.now().normalize().date())
-
+    NBP_API = 'https://api.nbp.pl/api/exchangerates/tables/c/'
     # take currency code and rate from NBP API
     try:
         data = requests.get(f'{NBP_API}{today}/')
@@ -83,51 +84,130 @@ def process_rates(code, date_start='', date_end=''):
             return {item['effectiveDate']: item['bid'] for item in data.json().get('rates')}
 
         else:
-            raise ({'error': f'Connection error {data.status_code}'})
+            raise ValueError({'error': f'Connection error {data.status_code}'})
 
 
 def fetch_historical_rate():
     '''
-    Fetches historical exchange rates for all transactions and calculates
-    the exchange rate for currency pairs
+    Fetches and calculates historical exchange rates for all currency pairs.
+
+    This function retrieves historical exchange rates for all currency pairs stored
+    in the database. To optimize performance, it keeps already fetched currency rates
+    in memory, ensuring faster access if the same currency is requested again. The
+    calculated rates are then saved for each pair.
 
 
     :return: None
     '''
-    transactions = Transaction.objects.all()
-    result = []
+    exchange = CurrencyExchangeRate.objects.all()
 
-    for pair in transactions:
-        currency = process_rates(pair.name[0:3])
-        quote_currency = process_rates(pair.name[3:])
+    # cache dict { 'EUR': {data1:rate1, date2:rate2, ... }, 'USD': { ....} }
+    # to avoid many request to the API for same rate which could make slower database save
+    rates_stored = {}
+    def get_stored_rates(code):
+        if code not in rates_stored:
+            rates_stored[code] = process_rates(code)
+        return rates_stored[code]
 
-        combined_rates = [
-            (date, rate / quote_currency[date]) for date, rate in currency.items() if date in quote_currency
+    # currency & quote_currency asking get_cached_rates for rates and date. it reduces API request to minimum
+    for pair in exchange:
+        base_code = pair.currency_exchange_pair[0:3]
+        quote_code = pair.currency_exchange_pair[3:]
 
-        ]
+        currency = get_stored_rates(base_code)
+        quote_currency = get_stored_rates(quote_code)
 
-        save_historical_data(pair.name, combined_rates)
-
+        try:
+            combined_rates = [
+                (date, rate / quote_currency[date]) for date, rate in currency.items() if date in quote_currency
+            ]
+            save_historical_data(pair.currency_exchange_pair, combined_rates)
+        except Exception as error:
+            return f'An error occurred {error}'
 
 def save_transaction(code):
     '''
-    Saves a currency pair code (e.g., 'USDEUR') to the database as a single string.
+
+    This function checks if the base and quote currencies exist in the database. If they exist, it save the currency pair
+    to the CurrencyExchangeRate model with the current exchange rate and date, after that celery send task to fetch
+    historical rates from 30 working days.
+
+    To avoid sending duplicate task to the Celery queue, a lock mechanism is implemented using Django caching system.
+
+    :return None
     '''
-    Transaction.objects.get_or_create(
-        name=code
+
+    today = ((pandas.Timestamp.now().normalize() - pandas.offsets.BDay(1)).date() if pandas.Timestamp.now().weekday() >= 5 else pandas.Timestamp.now().normalize().date())
+    currency = Currency.objects.get(code=code[0:3])
+    try:
+        quote_currency = Currency.objects.get(code=code[3:])
+    except Exception as error:
+        raise ValueError(f"The base currency '{code[:3]}' or the quote currency '{code[3:]}' does not exist. Details: {error}")
+
+
+    CurrencyExchangeRate.objects.get_or_create(
+        currency=currency,
+        currency_exchange_pair=code,
+        currency_exchange_rate=currency.rate_currency/quote_currency.rate_currency,
+        currency_exchange_date=today
     )
+    lock_key = f'loading_history:{code}'
+
+    # Used django cache to locking a pair of code (e.g, USDEUR) for 50 sec if someone request for it to many times to protect overload celery queue.
+    if not cache.get(lock_key):
+        cache.set(lock_key, True, timeout=50)
+        update_pair_history.delay()
+
 
 
 def save_historical_data(symbol, historical_data):
     '''
-    :param symbol: Taking pair or currency as symbol
-    :param historical_data: Filtered dict of historic dates and rates from Yahoo API
-    '''
-    transaction, created = Transaction.objects.get_or_create(name=symbol)
+    Saves historical exchange rate data for a currency pair.
 
+    historical_data: list of tuples, each containing a date (str) and rate (float).
+    '''
+
+    base_currency = Currency.objects.get(code=symbol[:3])
     for date, rate in historical_data:
-        CurrencyHistoryBid.objects.get_or_create(
-            transaction_name=transaction,
-            history_transaction_rate=rate,
-            history_date=date
+        CurrencyExchangeRate.objects.get_or_create(
+            currency_exchange_pair=symbol,
+            currency_exchange_date=date,
+            defaults={
+                'currency_exchange_rate': rate,
+                'currency': base_currency,
+            }
         )
+
+def generate_excel_currencies(queryset, pair):
+    '''
+    Function generate an Excel file, includes exchange rate pair, exchange rate , exchange rate date.
+
+    :param queryset: QuerySet, filtered data containing exchange rate details.
+
+    :param pair: str, currency pair (e.g., 'USDEUR')
+
+    :return: HttpResponse, response containing the Excel file for download.
+    '''
+    # prepare data to export to an Excel file.
+    data = list(queryset.values('currency_exchange_pair', 'currency_exchange_rate', 'currency_exchange_date'))
+    df = pandas.DataFrame(list(data))
+    df.rename(columns={
+        'currency_exchange_pair': 'Currency Pair',
+        'currency_exchange_rate': 'Exchange Rate',
+        'currency_exchange_date': 'Exchange Date',
+    }, inplace=True)
+
+    # create trigger to download an Excel file in web browser
+    response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+    response['Content-Disposition'] = f'attachment; filename="{pair}_exchange_rates.xlsx"'
+
+    with pandas.ExcelWriter(response, engine='openpyxl') as writer:
+        df.to_excel(writer, index=False, sheet_name=f'Exchange Rates {pair}')
+        worksheet = writer.sheets[f'Exchange Rates {pair}']
+
+        # add spaces in Excel file
+        for column, column_title in enumerate(df.columns, start=1):
+            column_letter = get_column_letter(column)
+            worksheet.column_dimensions[column_letter].width = 15
+
+    return response

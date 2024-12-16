@@ -6,46 +6,20 @@ This Django application provides a REST API for managing and querying currency e
 The application fetches the latest rates from the NBP API (Narodowy Bank Polski)
 and stores them in a local database. It also supports historical data tracking via
 the admin panel, allowing users to view records from up to 30 days in the past while 
-ignoring weekends when the market is closed.
+ignoring weekends when the market is closed. 
+
+With Docker, Celery, and Redis integrated, the application provides efficient background 
+processing for tasks such as fetching and storing historical exchange rates.
 
 ## Features
 
 ### API Endpoints:
 
-1. **`GET /currency/`**: Returns a list of all currencies in the database.
+1. **`GET /currency/<base_currency>/<quote_currency>/`**: Returns a currency pair and rates of asked currencies.
+
+**Example Request:** ``/currency/EUR/USD/``
 
 **Example Response:**
-
-```json
-[
-  {
-    "code": "USD"
-  },
-  {
-    "code": "EUR"
-  },
-  {
-    "code": "JPY"
-  }
-]
-```
-
-## Query Parameters:
-
-* `code`: Filter currencies by code (e.g., `/currency/?code=USD/` or `/currency/?code=U/`
-  for partial match like USD, AUD)
-
-* `min_rate` **and** `max_rate`: Filter currencies by rate range (e.g., `/currency/?min_rate=1.0&max_rate=1.5/`)
-
-* `sort_by` **and** `order`: Sort results by a specific field and order
-  (e.g., `/currency/?sort_by=code&order=desc/`). Default order is **ascending**
-
-
-- **`GET /currency/<base_currency>/<quote_currency>/`**: Fetches the exchange rate for a given currency pair.
-
-- **Example Request:** **`/currency/EUR/USD/`**
-
-**Example Response**
 
 ```json
 {
@@ -56,8 +30,21 @@ ignoring weekends when the market is closed.
 
 ## Admin interface:
 
-The admin panel includes functionality for viewing and managing historical
-exchange rates. Filters for **date ranges** and **currency pair** names simplify record navigation.
+The admin panel includes advanced functionality for managing and 
+analyzing historical exchange rates. Key features include:
+
+* **Filters:**
+    * Filter records by **date ranges** (using ``django-admin-rangefilter``)
+    * Filter records by **currency pair names** for easy navigation.
+
+* **Export to Excel:**
+    * Export filtered currency exchange rates directly to an Excel file for further analysis.
+    * To export, select a currency pair from the filters and click 
+      the "Export to Excel" button in the admin interface.
+  
+* **Enhanced Display:**
+  * View detailed fields such as exchange rate, currency pair, and date directly in the admin panel.
+
 
 ## Technologies Used
 
@@ -79,40 +66,86 @@ exchange rates. Filters for **date ranges** and **currency pair** names simplify
 
 * **Django Cache:** Used to optimize performance by caching frequently accessed exchange rate data, reducing API calls to the NBP API.
 
+* **Docker:** Containerization for consistent runtime environments.
+
+* **Redis:** Message broker used with Celery for task processing.
+
+* **Celery:** Handles background tasks like fetching and saving historical exchange rates.
 
 ## Installation and Setup
 
-1. Clone the repository:
+1. **Clone the repository:**
 
 ```bash
 git clone https://github.com/micheaszmaciag/currencyExchange
 ```
 
-2. Install dependencies:
+2. **Install dependencies:**
 
 ```shell
 pip install -r requirements.txt
 ```
 
-3. Apply Database migrations:
+3. **Set your SECRET_KEY:**
+
+Open ``settings.py`` and set a unique, secret value for ``SECRET_KEY``. For example:
+
+```bash
+  SECRET_KEY = 'your-secret-key-and-unique-key' 
+```
+
+4. **Apply Database migrations:**
 
 ```shell
 python manage.py migrate
 ```
 
-4. Load actual currency rates to the database:
+5. **Load actual currency rates to the database:**
 
 ```shell
 python manage.py load_rates
 ```
 
-5. Create a superuser to access the admin panel (recommended):
+6. **Create a superuser to access the admin panel (recommended):**
 
 ```bash
 python manage.py createsuperuser
 ```
 
-6. Start the development server:
+### Setting up Docker, Redis and Celery
+**Note:** These steps are required before running the development server. Without Redis and Celery,
+background tasks (fetching historical exchange rates) will not function properly.
+
+1. **Install Docker (if not already installed):**
+
+   * Follow the official Docker installation guide for your platform:
+    https://docs.docker.com/get-docker/
+
+
+2. **Run Redis in a Docker container:**
+
+   * Run the following command to start a Redis container named ``fetchDataRedis`` on port ``6379``:
+   ```bash
+      docker run -d -p 6379:6379 --name fetchDataRedis redis   
+   ```
+   * After running this, you can verify Redis is running by:
+   ```bash
+      docker ps    
+   ```
+   * In the Django settings (``settings.py``), ensure your Celery settings point to the local Redis:
+   ```bash
+      CELERY_BROKER_URL = 'redis://localhost:6379/0'
+      CELERY_RESULT_BACKEND = 'redis://localhost:6379/0'
+   ```
+3. **Start the Celery worker:** Open a new terminal window/tab in your project directory and run:
+   ```bash
+      celery -A currencyExchange worker --loglevel=info --pool=solo
+   ```
+   This will start a Celery worker that processes background tasks
+
+
+
+7. **Start the development server:**
 
 ```bash
 python manage.py runserver

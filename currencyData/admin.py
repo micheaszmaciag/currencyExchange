@@ -1,23 +1,38 @@
-from django.utils import timezone
 from django.contrib import admin
+from django.urls import path
 from rangefilter.filters import DateRangeFilter
-from .services import fetch_historical_rate
-from .models import CurrencyHistoryBid, Currency
-from django.core.cache import cache
+from .models import CurrencyExchangeRate
+from django.http import HttpResponse
+from .services import generate_excel_currencies
 
 
-# Register your models here.
+
+@admin.register(CurrencyExchangeRate)
+class CurrencyExchangeRateAdmin(admin.ModelAdmin):
+    list_display = ['currency_exchange_pair', 'currency_exchange_rate', 'currency_exchange_date']
+    list_filter = [('currency_exchange_date', DateRangeFilter), 'currency_exchange_pair']
+
+    def get_urls(self):
+        urls = super().get_urls()
+        custom_urls = [
+            path('export-filtered/', self.admin_site.admin_view(self.export_currencies_pair),
+                 name='export_filtered_currencies'),
+        ]
+        return custom_urls + urls
+
+    def export_currencies_pair(self, request):
+        pair = request.GET.get('currency_exchange_pair')
+
+        if not pair:
+            return HttpResponse("If you want to Export history to Excel first you have to choose <b>currency pair</b> by clicking for example <b>EURUSD</b> in FILTER"
+                                " <a href='/admin/currencyData/currencyexchangerate/'>Go back</a>", content_type="text/html")
+
+        queryset = CurrencyExchangeRate.objects.filter(currency_exchange_pair=pair)
+
+        if not queryset.exists():
+            return HttpResponse(f"There is no pair of currencies like: {pair} <a href='/admin/currencyData/currencyexchangerate/'>GO BACK</a>")
 
 
-@admin.register(CurrencyHistoryBid)
-class CurrencyHistoryBidAdmin(admin.ModelAdmin):
-    list_display = ['transaction_name', 'history_date', 'history_transaction_rate']
-    list_filter = [('history_date', DateRangeFilter), 'transaction_name']
+        return generate_excel_currencies(queryset,pair)
 
-    def changelist_view(self, request, extra_context=None):
-        # Using the cache mechanism to avoid unnecessary calls to the fetch_historical_rate
-        last_update = cache.get('last_historical_update')
-        if not last_update:
-            fetch_historical_rate()
-            cache.set('last_historical_update', timezone.now())
-        return super().changelist_view(request, extra_context=extra_context)
+
